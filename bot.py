@@ -13,7 +13,7 @@ GUILD_ID = int(os.getenv("GUILD_ID", "0"))
 VERIFY_CHANNEL_ID = int(os.getenv("VERIFY_CHANNEL_ID", "0"))
 VERIFY_ROLE_ID = int(os.getenv("VERIFY_ROLE_ID", "0"))
 WAITING_ROLE_ID = int(os.getenv("WAITING_ROLE_ID", "0"))
-LINK_URL = os.getenv("LINK_URL", "https://example.com")
+LINK_URL = os.getenv("LINK_URL", "https://example.com").rstrip("/")
 PORT = int(os.getenv("PORT", "8080"))
 
 async def handle_ping(request):
@@ -40,18 +40,23 @@ class VerifyView(discord.ui.View):
 
     @discord.ui.button(label="⏳ חכה 15 דקות", style=discord.ButtonStyle.secondary, custom_id="wait_15")
     async def wait_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("⏳ קיבלתי.", ephemeral=True)
+        await interaction.response.send_message(
+            "⏳ קיבלתי. תקבל גישה בעוד **15 דקות**. אנא המתן.",
+            ephemeral=True
+        )
         await asyncio.sleep(15 * 60)
+
         guild = interaction.guild
         member = interaction.user
         verify_role = guild.get_role(VERIFY_ROLE_ID)
         waiting_role = guild.get_role(WAITING_ROLE_ID)
+
         if verify_role and waiting_role:
             try:
                 await member.add_roles(verify_role)
                 if waiting_role in member.roles:
                     await member.remove_roles(waiting_role)
-                await member.send("✅ קיבלת גישה!")
+                await member.send("✅ קיבלת גישה לשרת Z.FOX IL ACCOUNT!")
             except Exception as e:
                 print(f"Error: {e}")
 
@@ -59,7 +64,7 @@ class VerifyView(discord.ui.View):
     async def link_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_name = str(interaction.user)
         encoded_name = urllib.parse.quote(user_name)
-        unique_link = f"{LINK_URL}?user={encoded_name}"
+        unique_link = f"{LINK_URL}/?user={encoded_name}"
         await interaction.response.send_message(f"🔗 {unique_link}", ephemeral=True)
 
 @bot.event
