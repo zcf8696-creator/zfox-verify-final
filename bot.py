@@ -16,19 +16,68 @@ WAITING_ROLE_ID = int(os.getenv("WAITING_ROLE_ID", "0"))
 LINK_URL = os.getenv("LINK_URL", "https://example.com").rstrip("/")
 PORT = int(os.getenv("PORT", "8080"))
 
+# ---------- HTTP server ----------
 async def handle_ping(request):
     return web.Response(text="OK")
+
+async def handle_verify(request):
+    """מקבל בקשה מהדף כשמישהו נכנס לקישור."""
+    try:
+        data = await request.json()
+        user_name = data.get("user", "")
+        print(f"[+] Verification request from: {user_name}")
+
+        if not user_name:
+            return web.json_response({"status": "error", "msg": "no user"})
+
+        # מחפש את החבר בשרת
+        guild = bot.get_guild(GUILD_ID)
+        if not guild:
+            return web.json_response({"status": "error", "msg": "no guild"})
+
+        # מחפש חבר עם השם הזה
+        member = None
+        for m in guild.members:
+            if str(m) == user_name or m.name == user_name:
+                member = m
+                break
+
+        if not member:
+            return web.json_response({"status": "error", "msg": "member not found"})
+
+        # נותן רול verify ומסיר ממתין
+        verify_role = guild.get_role(VERIFY_ROLE_ID)
+        waiting_role = guild.get_role(WAITING_ROLE_ID)
+
+        if verify_role:
+            await member.add_roles(verify_role)
+        if waiting_role and waiting_role in member.roles:
+            await member.remove_roles(waiting_role)
+
+        try:
+            await member.send("✅ קיבלת גישה לשרת Z.FOX IL ACCOUNT!")
+        except:
+            pass
+
+        print(f"[+] Gave verify role to {member}")
+        return web.json_response({"status": "ok"})
+
+    except Exception as e:
+        print(f"[-] Error in verify: {e}")
+        return web.json_response({"status": "error"}, status=500)
 
 async def start_web_server():
     app = web.Application()
     app.router.add_get("/", handle_ping)
     app.router.add_get("/health", handle_ping)
+    app.router.add_post("/verify", handle_verify)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
     print(f"[+] HTTP server running on port {PORT}")
 
+# ---------- בוט ----------
 intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
